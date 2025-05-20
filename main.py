@@ -3,10 +3,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed #Import to use m
 import re #Import the 're' module to use regular expression
 
 
-CLASS_REGEX = r"(?:public\s+class|class)\s+(\w+)"
-VARIABLE_REGEX = r"(?:public|private|protected|\s+)(\w+)\s+(\w+)\s*;"
+CLASS_REGEX = r"\b(?:public\s+|private\s+|protected\s+|abstract\s+|final\s+)?class\s+(\w+)"
+VARIABLE_REGEX = VARIABLE_REGEX = r"(?:private|protected|public)?\s+(?:static\s+|final\s+)?(?!return\b)(\w+)\s+(\w+)\s*;"
 JAVA_TYPES = ["boolean", "byte", "short", "char", "int", "long", "float","double", "Integer", "Boolean", "String", "Long"]   # Java Primitive types and String
-KEY_WORDS_SEARCH = ["ultimateEci", "parentEci", "hierarchy" ] #keywords to find
+
+KEY_WORDS_SEARCH = ["ultimateEci", "parentEci", "hierarchy", "hier" ] #keywords to find
+
+
+def clean_up(content:str)->str:
+    content_cleanup = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)    #Remove block comments
+    after_clean_up = re.sub(r'//.*', '', content_cleanup) #Remove in-line comments
+    clean_data = re.sub(r"import\s+.*?;\n|public\s+\w+\s+\w+$$.*?$$\s*{.*?}", "", after_clean_up, flags=re.DOTALL) #Removes imports statements
+    return clean_data
 
 
 def search_words(java_files: list)-> None:
@@ -28,11 +36,16 @@ def search_words(java_files: list)-> None:
             continue        
 
 
+        #Cleanup
+        cleaned_content = clean_up(content)
+
         #Extract class name: 
-        classMatch = re.search(CLASS_REGEX, content)
+        classMatch = re.search(CLASS_REGEX, cleaned_content)
 
         if classMatch: #Checks if class definition was found in the current file. 
+            # print(f"Full Match: {classMatch.group(0)}")
             parentClassName = classMatch.group(1)  # Extracts the captured class name from the regex match.
+            # print(f"Extracted Class Name: {parentClassName}")
             
             if parentClassName in searchedFiles:
                 continue
@@ -41,15 +54,18 @@ def search_words(java_files: list)-> None:
             continue    
 
         #Extract class-level variables with their types
-        for match in re.finditer(VARIABLE_REGEX, content):
+        for match in re.finditer(VARIABLE_REGEX, cleaned_content):
             var_type = match.group(1) #Extracts the variable type from the regex
             var_name = match.group(2) #Extracts the variable name from the regex
-            class_variables[var_name] = var_type #Storing class variables and their types
+
+            if ';' in cleaned_content[match.start() :match.end()]:
+                # print(f"Extracted Variable Type: {var_type}, Variable Name: {var_name}") 
+                class_variables[var_name] = var_type #Storing class variables and their types
 
         foundInParent = False #Intializaing flag to track if the keyword found as a variable in parent class     
         for keyword in KEY_WORDS_SEARCH:
             for var_name in class_variables:
-                if keyword in var_name:
+                if keyword.lower() in var_name.lower():
                     print(f"Keyword '{keyword}' found as a substring in variable '{var_name}' of class: {parentClassName}") # Prints a message indicating the found keyword and the class name.
                     foundInParent = True #Sets the flag True as keyword found in the parent class
                     break #Exits the loop since, the match was found in parent level
@@ -94,7 +110,7 @@ def search_in_child(child_filepath: str, keywords: list, parent_class_name: str,
 
     for keyword in keywords:
         for var_name in child_varibles:
-            if keyword in var_name:
+            if keyword.lower() in var_name.lower():
                 print(f"Keyword '{keyword}' found as a substring in variable '{var_name}' of the child class: {child_class_name}, referred by parent class: {parent_class_name}")
                 return # Found in child, no need to search further in this branch
 
@@ -106,11 +122,11 @@ def is_valid_java_file(file_path: str):
     Filters class that endsWith ".java" and removes all classes that have name "Test"
     """
     filename = os.path.basename(file_path)
-    return filename.endswith(".java") and "Test" not in filename and os.path.isfile(file_path)
+    return filename.endswith(".java") and "Test" not in filename and ( "Response" in filename  or "Request" in filename) and os.path.isfile(file_path)
 
 
 
-def filter_java_files_recursive(search_directory: str, max_workers=10) -> list: #max_workers is default set to 10
+def filter_java_files_recursive(search_directory: str, max_workers=25) -> list: #max_workers is default set to 25
 
     """
     Recursively finds all Java Files in a directory and subdirectories
