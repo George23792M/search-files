@@ -6,7 +6,7 @@ from typing import Optional
 
 
 CLASS_REGEX = r"\b(?:public\s+|private\s+|protected\s+|abstract\s+|final\s+)?class\s+(\w+)"
-VARIABLE_REGEX = VARIABLE_REGEX = r"(?:private|protected|public)?\s+(?:static\s+|final\s+)?(?!return\b)(\w+)\s+(\w+)\s*;"
+VARIABLE_REGEX = r"(?:private|protected|public)?\s+(?:static\s+|final\s+)?(?!return\b)(\w+)\s+(\w+)\s*;"
 JAVA_TYPES = ["boolean", "byte", "short", "char", "int", "long", "float","double", "Integer", "Boolean", "String", "Long"]   # Java Primitive types and String
 
 KEY_WORDS_SEARCH = ["ultimateEci", "parentEci", "hierarchy", "hier" ] #keywords to find
